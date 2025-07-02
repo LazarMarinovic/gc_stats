@@ -1,6 +1,6 @@
 # GC Stats Toolbox
 
-A Python toolbox for analyzing price activity and statistical patterns in futures/crypto/stock OHLCV data, with a focus on multi-timeframe studies and systematic hypothesis testing.
+A Python toolbox for analyzing price activity and statistical patterns in futures OHLCV data, with a focus on multi-timeframe studies and systematic hypothesis testing.
 
 ## Project Structure
 
@@ -36,13 +36,7 @@ A Python toolbox for analyzing price activity and statistical patterns in future
 
 ## Usage
 
-### 1. Analyze a Specific Timeframe (e.g., 09:00–09:20)
-
-```sh
-python -m scripts.analyze_timeframe data/raw/your_5min_file.csv
-```
-
-### 2. Run the Strong Hourly Close Pivot Experiment
+### Run the Strong Hourly Close Pivot Experiment
 
 This experiment tests the probability of price reversion after a strong hourly breakout, using 5-minute candles for intra-hour price action.
 
