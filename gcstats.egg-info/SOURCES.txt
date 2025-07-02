@@ -1,0 +1,11 @@
+README.md
+setup.py
+gcstats/__init__.py
+gcstats/analysis.py
+gcstats/experiments.py
+gcstats/io.py
+gcstats/utils.py
+gcstats.egg-info/PKG-INFO
+gcstats.egg-info/SOURCES.txt
+gcstats.egg-info/dependency_links.txt
+gcstats.egg-info/top_level.txt
