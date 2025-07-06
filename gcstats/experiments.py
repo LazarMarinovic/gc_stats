@@ -181,7 +181,7 @@ def _format_stats_table(stats, segment_labels):
             tp1_pct = (tp1 / total * 100) if total else 0
             tp2_pct = (tp2 / total * 100) if total else 0
             rows.append([
-                f"{hour:02d}:00", seg, total, tp1, f"{tp1_pct:.1f}%", tp2, f"{tp2_pct:.1f}%"
+                f"{hour}", seg, total, tp1, f"{tp1_pct:.1f}%", tp2, f"{tp2_pct:.1f}%"
             ])
     headers = ["Hour", "Segment", "Pivot Hits", "TP1 Hits", "TP1 %", "TP2 Hits", "TP2 %"]
     return tabulate(rows, headers=headers, tablefmt="github")
@@ -197,9 +197,92 @@ def _output_stats_to_csv(stats, segment_labels, csv_output):
             tp1_pct = (tp1 / total * 100) if total else 0
             tp2_pct = (tp2 / total * 100) if total else 0
             rows.append([
-                f"{hour:02d}:00", seg, total, tp1, tp1_pct, tp2, tp2_pct
-            ])
+                f"{hour}", seg, total, tp1, tp1_pct, tp2, tp2_pct
+                ])
     headers = ["Hour", "Segment", "Pivot Hits", "TP1 Hits", "TP1 %", "TP2 Hits", "TP2 %"]
     df = pd.DataFrame(rows, columns=headers)
     os.makedirs(os.path.dirname(csv_output), exist_ok=True)
     df.to_csv(csv_output, index=False) 
+
+
+def strong_4h_close_experiment(fourh_df: pd.DataFrame, five_min_df: pd.DataFrame, print_every: int = 10, csv_output: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Isto kao strong_hourly_close_experiment, ali koristi 4h candle-ove kao ulaz.
+    Detektuje strong close na 4h candle i analizira kako se 5m candles ponasaju u narednih 4h.
+    """
+    stats = {}
+    segments = [(0, 59), (60, 119), (120, 179), (180, 239)]
+    segment_labels = ["00–59", "60–119", "120–179", "180-239"]
+    event_count = 0
+
+    fourh_df = fourh_df.copy()
+    five_min_df = five_min_df.copy()
+    fourh_df['datetime'] = pd.to_datetime(fourh_df['datetime'])
+    five_min_df['datetime'] = pd.to_datetime(five_min_df['datetime'])
+    fourh_df = fourh_df.sort_values('datetime').reset_index(drop=True)
+    five_min_df = five_min_df.sort_values('datetime').reset_index(drop=True)
+
+    for i in range(2, len(fourh_df)):
+        candle2 = fourh_df.iloc[i - 2]
+        candle1 = fourh_df.iloc[i - 1]
+        candle0 = fourh_df.iloc[i]
+        block_start = candle0['datetime']
+        block_end = block_start + pd.Timedelta(hours=4)
+        block_label = f"{block_start:%Y-%m-%d %H:%M}"
+
+        if candle1['close'] > candle2['high']:
+            pivot = candle2['high']
+            tp1 = candle0['open']
+            tp2 = candle1['high']
+            direction = 'bullish'
+        elif candle1['close'] < candle2['low']:
+            pivot = candle2['low']
+            tp1 = candle0['open']
+            tp2 = candle1['low']
+            direction = 'bearish'
+        else:
+            continue
+
+        mask = (five_min_df['datetime'] >= block_start) & (five_min_df['datetime'] < block_end)
+        block_5m = five_min_df[mask].reset_index(drop=True)
+        if block_5m.empty:
+            continue
+
+        pivot_hit_idx = None
+        segment_idx = None
+        for idx, row in block_5m.iterrows():
+            if row['low'] <= pivot <= row['high']:
+                pivot_hit_idx = idx
+                minute_offset = int((row['datetime'] - block_start).total_seconds() // 60)
+                for s, (start, end) in enumerate(segments):
+                    if start <= minute_offset < end:
+                        segment_idx = s
+                        break
+                break
+
+        if pivot_hit_idx is None or segment_idx is None:
+            continue
+
+        if block_label not in stats:
+            stats[block_label] = [{"total": 0, "tp1": 0, "tp2": 0} for _ in segments]
+        stats[block_label][segment_idx]["total"] += 1
+
+        after_pivot = block_5m.iloc[pivot_hit_idx + 1:]
+        if not after_pivot.empty:
+            if any((after_pivot['low'] <= tp1) & (after_pivot['high'] >= tp1)):
+                stats[block_label][segment_idx]["tp1"] += 1
+            if any((after_pivot['low'] <= tp2) & (after_pivot['high'] >= tp2)):
+                stats[block_label][segment_idx]["tp2"] += 1
+
+        event_count += 1
+        if event_count % print_every == 0:
+            print("\n--- Live Stats Table ---")
+            print(_format_stats_table(stats, segment_labels))
+
+    print("\n--- Final Stats Table ---")
+    print(_format_stats_table(stats, segment_labels))
+    if csv_output:
+        _output_stats_to_csv(stats, segment_labels, csv_output)
+        print(f"\nStats table saved to {csv_output}")
+    return stats
+
