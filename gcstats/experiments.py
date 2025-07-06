@@ -207,8 +207,8 @@ def _output_stats_to_csv(stats, segment_labels, csv_output):
 
 def strong_4h_close_experiment(fourh_df: pd.DataFrame, five_min_df: pd.DataFrame, print_every: int = 10, csv_output: Optional[str] = None) -> Dict[str, Any]:
     """
-    Isto kao strong_hourly_close_experiment, ali koristi 4h candle-ove kao ulaz.
-    Detektuje strong close na 4h candle i analizira kako se 5m candles ponasaju u narednih 4h.
+    Same as strong_hourly_close_experiment, but uses 4h candles as input.
+    Detects strong close on 4h candle and analyzes how 5m candles react at next 4h.
     """
     stats = {}
     segments = [(0, 59), (60, 119), (120, 179), (180, 239)]

@@ -4,20 +4,21 @@ import os
 INPUT_PATH = "data/processed/hourly.csv"
 OUTPUT_PATH = "data/processed/4h.csv"
 
-# Učitaj 1h candle-ove
+# Load 1h candles
 df = pd.read_csv(INPUT_PATH, sep=";")
 
-# Pretvori kolone 'date' i 'time' u jedan datetime objekat ako su odvojene
+
+# Join columns 'date' and 'time' into one datetime object
 if "date" in df.columns and "time" in df.columns:
     df["datetime"] = pd.to_datetime(df["date"] + " " + df["time"], dayfirst=True)
 elif "datetime" in df.columns:
     df["datetime"] = pd.to_datetime(df["datetime"], dayfirst=True)
 else:
-    raise ValueError("CSV mora imati 'datetime' ili 'date' i 'time' kolone")
+    raise ValueError("CSV must have 'datetime' or 'date' and 'time' columns")
 
 df = df.set_index("datetime")
 
-# Resample na 4h
+# Resample on 4h
 df_4h = df.resample("4H").agg({
     "open": "first",
     "high": "max",
@@ -26,11 +27,11 @@ df_4h = df.resample("4H").agg({
     "volume": "sum"
 })
 
-# Ukloni nepotpune redove
+# Remove unnecessary columns
 df_4h = df_4h.dropna().reset_index()
 
-# Snimi fajl
+# Record file
 os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
 df_4h.to_csv(OUTPUT_PATH, sep=";", index=False)
 
-print(f"✅ 4h candle-ovi sačuvani u '{OUTPUT_PATH}'")
+print(f"✅ 4h candles saved into '{OUTPUT_PATH}'")

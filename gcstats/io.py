@@ -10,7 +10,7 @@ def load_ohlcv(filepath: str | Path) -> pd.DataFrame:
     """
     df = pd.read_csv(filepath, sep=';')
 
-    # Ako ima 'date' i 'time', koristi ih za kreiranje 'datetime'
+    # If there is 'date' and 'time', use them to create 'datetime'
     if 'date' in df.columns and 'time' in df.columns:
         try:
             df['datetime'] = pd.to_datetime(df['date'] + ' ' + df['time'], format='%d.%m.%Y %H:%M')
@@ -18,13 +18,13 @@ def load_ohlcv(filepath: str | Path) -> pd.DataFrame:
             df['datetime'] = pd.to_datetime(df['date'] + ' ' + df['time'], format='%d/%m/%Y %H:%M')
         df = df.drop(['date', 'time'], axis=1)
 
-    # Ako ima već datetime kolonu
+    # If datetime column already exists
     elif 'datetime' in df.columns:
-        # Samo automatski parsiraj bez specificiranja formata
+        # Automaticaly parse without specified format
         df['datetime'] = pd.to_datetime(df['datetime'], errors='raise', format='mixed')
 
     else:
-        raise ValueError("CSV mora imati 'datetime' ili 'date' i 'time' kolone.")
+        raise ValueError("CSV must have 'datetime' or 'date' and 'time' columns.")
 
     df = df[['datetime', 'open', 'high', 'low', 'close', 'volume']]
     return df

@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
-# Parametri
+# Parameters
 start_time = datetime(2024, 1, 1, 0, 0)
 num_candles = 200  # 200 x 4h = ~33 dana
 
@@ -31,6 +31,6 @@ for _ in range(num_candles):
 
 df = pd.DataFrame(data, columns=['datetime', 'open', 'high', 'low', 'close', 'volume'])
 
-# Sačuvaj u processed/
+# Save to processed/
 df.to_csv("data/processed/4h.csv", sep=';', index=False)
 print("✅ Generated 4h.csv with", len(df), "candles.")
