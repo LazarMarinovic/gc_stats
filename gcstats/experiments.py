@@ -171,44 +171,64 @@ def strong_hourly_close_experiment(hourly_df: pd.DataFrame, five_min_df: pd.Data
     return stats
 
 def _format_stats_table(stats, segment_labels):
-    rows = []
-    for hour in sorted(stats.keys()):
+    # Aggregate stats for each (block_label, segment)
+    agg = {}
+    for block_label in stats:
         for seg_idx, seg in enumerate(segment_labels):
-            s = stats[hour][seg_idx]
-            total = s["total"]
-            tp1 = s["tp1"]
-            tp2 = s["tp2"]
-            tp1_pct = (tp1 / total * 100) if total else 0
-            tp2_pct = (tp2 / total * 100) if total else 0
-            rows.append([
-                f"{hour}", seg, total, tp1, f"{tp1_pct:.1f}%", tp2, f"{tp2_pct:.1f}%"
-            ])
+            key = (block_label, seg)
+            s = stats[block_label][seg_idx]
+            if key not in agg:
+                agg[key] = {"total": 0, "tp1": 0, "tp2": 0}
+            agg[key]["total"] += s["total"]
+            agg[key]["tp1"] += s["tp1"]
+            agg[key]["tp2"] += s["tp2"]
+    rows = []
+    for (block_label, seg) in sorted(agg.keys()):
+        s = agg[(block_label, seg)]
+        total = s["total"]
+        tp1 = s["tp1"]
+        tp2 = s["tp2"]
+        tp1_pct = (tp1 / total * 100) if total else 0
+        tp2_pct = (tp2 / total * 100) if total else 0
+        rows.append([
+            block_label, seg, total, tp1, f"{tp1_pct:.1f}%", tp2, f"{tp2_pct:.1f}%"
+        ])
     headers = ["Hour", "Segment", "Pivot Hits", "TP1 Hits", "TP1 %", "TP2 Hits", "TP2 %"]
     return tabulate(rows, headers=headers, tablefmt="github")
 
 def _output_stats_to_csv(stats, segment_labels, csv_output):
-    rows = []
-    for hour in sorted(stats.keys()):
+    # Aggregate stats for each (block_label, segment)
+    agg = {}
+    for block_label in stats:
         for seg_idx, seg in enumerate(segment_labels):
-            s = stats[hour][seg_idx]
-            total = s["total"]
-            tp1 = s["tp1"]
-            tp2 = s["tp2"]
-            tp1_pct = (tp1 / total * 100) if total else 0
-            tp2_pct = (tp2 / total * 100) if total else 0
-            rows.append([
-                f"{hour}", seg, total, tp1, tp1_pct, tp2, tp2_pct
-                ])
+            key = (block_label, seg)
+            s = stats[block_label][seg_idx]
+            if key not in agg:
+                agg[key] = {"total": 0, "tp1": 0, "tp2": 0}
+            agg[key]["total"] += s["total"]
+            agg[key]["tp1"] += s["tp1"]
+            agg[key]["tp2"] += s["tp2"]
+    rows = []
+    for (block_label, seg) in sorted(agg.keys()):
+        s = agg[(block_label, seg)]
+        total = s["total"]
+        tp1 = s["tp1"]
+        tp2 = s["tp2"]
+        tp1_pct = (tp1 / total * 100) if total else 0
+        tp2_pct = (tp2 / total * 100) if total else 0
+        rows.append([
+            block_label, seg, total, tp1, tp1_pct, tp2, tp2_pct
+        ])
     headers = ["Hour", "Segment", "Pivot Hits", "TP1 Hits", "TP1 %", "TP2 Hits", "TP2 %"]
     df = pd.DataFrame(rows, columns=headers)
     os.makedirs(os.path.dirname(csv_output), exist_ok=True)
-    df.to_csv(csv_output, index=False) 
-
+    df.to_csv(csv_output, index=False)
 
 def strong_4h_close_experiment(fourh_df: pd.DataFrame, five_min_df: pd.DataFrame, print_every: int = 10, csv_output: Optional[str] = None) -> Dict[str, Any]:
     """
     Same as strong_hourly_close_experiment, but uses 4h candles as input.
     Detects strong close on 4h candle and analyzes how 5m candles react at next 4h.
+    Aggregates stats by hour of day (e.g., '08:00') and segment.
     """
     stats = {}
     segments = [(0, 59), (60, 119), (120, 179), (180, 239)]
@@ -228,7 +248,8 @@ def strong_4h_close_experiment(fourh_df: pd.DataFrame, five_min_df: pd.DataFrame
         candle0 = fourh_df.iloc[i]
         block_start = candle0['datetime']
         block_end = block_start + pd.Timedelta(hours=4)
-        block_label = f"{block_start:%Y-%m-%d %H:%M}"
+        # Use hour of day as key (e.g., '08:00')
+        hour_of_day = block_start.strftime("%H:00")
 
         if candle1['close'] > candle2['high']:
             pivot = candle2['high']
@@ -263,16 +284,16 @@ def strong_4h_close_experiment(fourh_df: pd.DataFrame, five_min_df: pd.DataFrame
         if pivot_hit_idx is None or segment_idx is None:
             continue
 
-        if block_label not in stats:
-            stats[block_label] = [{"total": 0, "tp1": 0, "tp2": 0} for _ in segments]
-        stats[block_label][segment_idx]["total"] += 1
+        if hour_of_day not in stats:
+            stats[hour_of_day] = [{"total": 0, "tp1": 0, "tp2": 0} for _ in segments]
+        stats[hour_of_day][segment_idx]["total"] += 1
 
         after_pivot = block_5m.iloc[pivot_hit_idx + 1:]
         if not after_pivot.empty:
             if any((after_pivot['low'] <= tp1) & (after_pivot['high'] >= tp1)):
-                stats[block_label][segment_idx]["tp1"] += 1
+                stats[hour_of_day][segment_idx]["tp1"] += 1
             if any((after_pivot['low'] <= tp2) & (after_pivot['high'] >= tp2)):
-                stats[block_label][segment_idx]["tp2"] += 1
+                stats[hour_of_day][segment_idx]["tp2"] += 1
 
         event_count += 1
         if event_count % print_every == 0:
